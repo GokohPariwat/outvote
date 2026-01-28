@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบค้นหาข้อมูลผู้มีสิทธิ์เลือกตั้งล่วงหน้านอกเขต - สำนักงานเขตพญาไท</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        /* Loading Overlay */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #8b5cf6; /* เปลี่ยนเป็นสีม่วงเพื่อให้เข้ากับโลโก้ */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center flex-col text-white">
+        <div class="loader mb-4"></div>
+        <p class="text-lg font-medium">กำลังประมวลผลฐานข้อมูล...</p>
+        <p class="text-sm text-gray-300">กรุณารอสักครู่ (ระบบกำลังสร้างดัชนีการค้นหา)</p>
+    </div>
+
+    <!-- Header (จะแสดงปุ่มอัปโหลดเล็ก ก็ต่อเมื่อเข้าสู่หน้าค้นหาแล้ว) -->
+    <!-- ปรับสี Header เป็นสีม่วงโทนเดียวกับโลโก้เขตพญาไท -->
+    <header class="bg-purple-900 text-white shadow-lg sticky top-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <!-- Logo Image -->
+                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md p-1 overflow-hidden">
+                     <img src="logo สำนักงานเขตพญาไท.jpg" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Seal_of_Bangkok_Metropolitan_Administration.svg/1200px-Seal_of_Bangkok_Metropolitan_Administration.svg.png'">
+                </div>
+                <div>
+                    <h1 class="text-sm md:text-lg font-bold leading-tight">ระบบค้นหาข้อมูลผู้มีสิทธิ์เลือกตั้งล่วงหน้านอกเขต</h1>
+                    <p class="text-[10px] text-purple-200">สำนักงานเขตพญาไท</p>
+                </div>
+            </div>
+            
+            <!-- ปุ่ม Upload มุมขวาบน (ซ่อนในตอนแรก) -->
+            <div id="headerActions" class="hidden">
+                <label for="csvFileInputHeader" class="cursor-pointer bg-purple-800 hover:bg-purple-700 text-white py-1.5 px-3 rounded-md border border-purple-600 shadow-sm transition-all text-xs font-medium flex items-center gap-2">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                    เปลี่ยนไฟล์ CSV
+                </label>
+                <input type="file" id="csvFileInputHeader" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-8 relative">
+
+        <!-- 1. LANDING PAGE (หน้าแรกสำหรับอัปโหลด) -->
+        <div id="landingPage" class="absolute inset-0 flex flex-col items-center justify-center z-40 fade-in px-4" style="margin-top: -80px;">
+            <div class="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-lg w-full border border-purple-100">
+                
+                <!-- Large Logo on Landing Page -->
+                <div class="w-32 h-32 mx-auto mb-6">
+                    <img src="logo สำนักงานเขตพญาไท.jpg" alt="Logo เขตพญาไท" class="w-full h-full object-contain drop-shadow-lg" onerror="this.parentElement.innerHTML='<div class=\'w-full h-full bg-purple-50 text-purple-600 rounded-full flex items-center justify-center text-4xl shadow-inner\'><i class=\'fa-solid fa-building-columns\'></i></div>'">
+                </div>
+
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">ระบบค้นหาข้อมูลผู้มีสิทธิ์เลือกตั้งล่วงหน้า</h2>
+                <p class="text-gray-500 mb-8">สำนักงานเขตพญาไท</p>
+                
+                <label for="csvFileInputMain" class="cursor-pointer group relative flex w-full justify-center rounded-xl bg-purple-700 px-8 py-4 text-base font-semibold text-white shadow-lg hover:bg-purple-600 hover:shadow-purple-500/30 transition-all duration-200">
+                    <span class="flex items-center gap-3">
+                        <i class="fa-solid fa-folder-open text-xl group-hover:scale-110 transition-transform"></i>
+                        นำเข้าฐานข้อมูล (CSV)
+                    </span>
+                </label>
+                <input type="file" id="csvFileInputMain" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+                
+                <p class="text-xs text-gray-400 mt-6 border-t pt-4">
+                    รองรับไฟล์ขนาดใหญ่
+                </p>
+            </div>
+        </div>
+        
+        <!-- 2. APP CONTENT (ส่วนค้นหาและแสดงผล - ซ่อนไว้ตอนแรก) -->
+        <div id="appContent" class="hidden fade-in">
+            <!-- Search Bar -->
+            <div class="max-w-2xl mx-auto mb-8 text-center sticky top-20 z-40 mt-2">
+                <div class="relative group shadow-lg rounded-2xl">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                        <i class="fa-solid fa-magnifying-glass text-gray-400 group-hover:text-purple-500 transition-colors"></i>
+                    </div>
+                    <input type="text" id="searchInput" 
+                        class="block w-full p-4 pl-12 text-lg text-gray-900 border border-gray-300 rounded-2xl bg-white/95 backdrop-blur focus:ring-4 focus:ring-purple-100 focus:border-purple-500 outline-none transition-all" 
+                        placeholder="พิมพ์เพื่อค้นหา: เลขบัตร, ชื่อ, หรือนามสกุล..."
+                        onkeyup="debouncedSearch()">
+                    
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                        <span id="resultStats" class="text-xs font-medium text-purple-600 bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-lg hidden">
+                            0 รายการ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination Controls (Top) -->
+            <div id="paginationControlsTop" class="flex justify-between items-center mb-4 hidden">
+                <button onclick="changePage(-1)" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm">
+                    <i class="fa-solid fa-chevron-left mr-1"></i> ก่อนหน้า
+                </button>
+                <span id="pageInfoTop" class="text-sm text-gray-600 font-medium">หน้า 1 / 1</span>
+                <button onclick="changePage(1)" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm">
+                    ถัดไป <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+
+            <!-- Results Grid -->
+            <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <!-- Cards injected via JS -->
+            </div>
+
+            <!-- Pagination Controls (Bottom) -->
+            <div id="paginationControlsBottom" class="flex justify-center items-center mt-8 gap-4 hidden">
+                <button onclick="changePage(-1)" id="btnPrev" class="w-10 h-10 flex items-center justify-center bg-white border border-gray-300 text-gray-700 rounded-full hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed shadow transition-all">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span id="pageInfoBottom" class="text-gray-600 font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200">
+                    หน้า 1
+                </span>
+                <button onclick="changePage(1)" id="btnNext" class="w-10 h-10 flex items-center justify-center bg-white border border-gray-300 text-gray-700 rounded-full hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed shadow transition-all">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Not Found State -->
+            <div id="notFoundState" class="text-center py-20 hidden">
+                <div class="inline-block p-6 rounded-full bg-gray-100 mb-4">
+                    <i class="fa-solid fa-magnifying-glass-minus text-4xl text-gray-400"></i>
+                </div>
+                <h3 class="text-xl font-medium text-gray-600">ไม่พบข้อมูลที่ค้นหา</h3>
+                <p class="text-gray-500 mt-2">ลองตรวจสอบคำสะกด หรือค้นหาด้วยเงื่อนไขอื่น</p>
+            </div>
+        </div>
+        
+    </main>
+
+    <footer class="bg-white border-t py-4 mt-auto">
+        <div class="container mx-auto px-4 text-center text-gray-500 text-xs">
+            <p>ระบบค้นหาข้อมูลผู้มีสิทธิ์เลือกตั้งล่วงหน้านอกเขต สำนักงานเขตพญาไท <br> Developed by Nitithon</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- Configuration & State ---
+        let allData = [];        
+        let filteredData = [];   
+        let currentPage = 1;     
+        const ITEMS_PER_PAGE = 24; 
+        let searchTimeout = null; 
+
+        // --- เริ่มต้นใช้งาน (ไม่มีข้อมูลตัวอย่างแล้ว) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // เช็คสถานะเริ่มต้น: ไม่มีข้อมูล -> แสดง Landing Page
+            toggleViews();
+        });
+
+        // ฟังก์ชันสลับหน้าจอ (Landing vs App)
+        function toggleViews() {
+            const landing = document.getElementById('landingPage');
+            const app = document.getElementById('appContent');
+            const headerActions = document.getElementById('headerActions');
+
+            if (allData.length === 0) {
+                // ยังไม่มีข้อมูล: โชว์หน้า Landing
+                landing.classList.remove('hidden');
+                landing.classList.add('flex'); // ใช้ flex จัดกึ่งกลาง
+                app.classList.add('hidden');
+                headerActions.classList.add('hidden');
+            } else {
+                // มีข้อมูลแล้ว: ซ่อน Landing, โชว์ App
+                landing.classList.add('hidden');
+                landing.classList.remove('flex');
+                app.classList.remove('hidden');
+                headerActions.classList.remove('hidden'); // โชว์ปุ่มเปลี่ยนไฟล์ข้างบน
+            }
+        }
+
+        // --- 1. File Upload Logic ---
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+
+            setTimeout(() => {
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    worker: true,
+                    complete: function(results) {
+                        const rawData = results.data.map((row, index) => ({
+                            id: index,
+                            idCard: (row['เลขประจำตัวประชาชน'] || row[0] || "").trim(),
+                            seq: (row['ลำดับที่'] || row[1] || "").trim(),
+                            prefix: (row['คำนำหน้า'] || row[2] || "").trim(),
+                            firstName: (row['ชื่อ'] || row[3] || "").trim(),
+                            lastName: (row['สกุล'] || row[4] || "").trim(),
+                            gender: (row['เพศ'] || row[5] || "").trim(),
+                            districtCode: (row['รหัสเขตเลือกตั้ง'] || row[6] || "").trim(),
+                            province: (row['จังหวัด'] || row[7] || "").trim(),
+                            setNo: (row['ชุดที่'] || row[8] || "").trim(),
+                            searchStr: `${row['เลขประจำตัวประชาชน']} ${row['ชื่อ']} ${row['สกุล']} ${row['จังหวัด']} ${row['รหัสเขตเลือกตั้ง']} ${row['ชุดที่']}`.toLowerCase()
+                        }));
+
+                        // กรองข้อมูลว่างออก
+                        allData = rawData.filter(item => item.idCard !== "");
+                        filteredData = allData; // เริ่มต้นให้แสดงทั้งหมดที่โหลดมา
+                        
+                        document.getElementById('searchInput').value = '';
+                        currentPage = 1;
+
+                        toggleViews(); // สลับไปหน้า App
+                        updateView();  // แสดงผล
+                        
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                    },
+                    error: function(err) {
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                        alert('เกิดข้อผิดพลาด: ' + err.message);
+                    }
+                });
+            }, 100);
+        }
+
+        // --- 2. Search Logic ---
+        function debouncedSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performSearch();
+            }, 300);
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            if (query === "") {
+                filteredData = allData;
+            } else {
+                filteredData = allData.filter(item => item.searchStr.includes(query));
+            }
+
+            currentPage = 1;
+            updateView();
+        }
+
+        // --- 3. Pagination Logic ---
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+            const newPage = currentPage + direction;
+
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderGrid(); 
+                updatePaginationUI(totalPages);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // --- 4. Render Logic ---
+        function updateView() {
+            const totalItems = filteredData.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            const hasData = totalItems > 0;
+
+            // Stats
+            const stats = document.getElementById('resultStats');
+            stats.innerText = `พบ ${totalItems.toLocaleString()} รายการ`;
+            stats.classList.remove('hidden');
+
+            // Toggle Not Found vs Grid
+            if (!hasData) {
+                document.getElementById('resultsGrid').classList.add('hidden');
+                document.getElementById('notFoundState').classList.remove('hidden');
+                document.getElementById('paginationControlsTop').classList.add('hidden');
+                document.getElementById('paginationControlsBottom').classList.add('hidden');
+            } else {
+                document.getElementById('resultsGrid').classList.remove('hidden');
+                document.getElementById('notFoundState').classList.add('hidden');
+                document.getElementById('paginationControlsTop').classList.remove('hidden');
+                document.getElementById('paginationControlsBottom').classList.remove('hidden');
+                
+                renderGrid();
+                updatePaginationUI(totalPages);
+            }
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('resultsGrid');
+            const start = (currentPage - 1) * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            const pageData = filteredData.slice(start, end);
+
+            const htmlString = pageData.map(item => {
+                // ปรับสีไอคอนให้เข้ากับ Theme ม่วง/ชมพู
+                const genderIcon = item.gender.includes('หญิง') ? 'fa-venus text-pink-500' : 'fa-mars text-blue-500';
+                const genderBg = item.gender.includes('หญิง') ? 'bg-pink-50' : 'bg-blue-50';
+
+                return `
+                    <div class="glass-panel bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all border border-gray-100 flex flex-col relative group">
+                        <div class="absolute top-0 right-0 z-10">
+                            <div class="bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-bl-lg shadow-sm">
+                                ชุดที่ ${item.setNo || '-'}
+                            </div>
+                        </div>
+
+                        <div class="p-4 flex-grow">
+                            <div class="mb-3 pb-2 border-b border-gray-100">
+                                <p class="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">เลขประจำตัวประชาชน</p>
+                                <h2 class="text-xl font-bold text-purple-900 tracking-wide font-mono select-all">
+                                    ${formatIdCard(item.idCard)}
+                                </h2>
+                            </div>
+
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 ${genderBg} rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fa-solid ${genderIcon}"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">ลำดับที่ ${item.seq}</p>
+                                    <h3 class="text-base font-bold text-gray-800 leading-tight">
+                                        <span class="font-normal text-gray-600">${item.prefix}</span>
+                                        ${item.firstName} ${item.lastName}
+                                    </h3>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div class="bg-gray-50 px-2 py-1.5 rounded border border-gray-100">
+                                    <span class="text-gray-400 block text-[10px]">จังหวัด</span>
+                                    <span class="font-medium text-gray-700 truncate block">
+                                        <i class="fa-solid fa-map-pin text-purple-400 mr-1"></i>${item.province}
+                                    </span>
+                                </div>
+                                <div class="bg-gray-50 px-2 py-1.5 rounded border border-gray-100">
+                                    <span class="text-gray-400 block text-[10px]">เขตเลือกตั้ง</span>
+                                    <span class="font-medium text-gray-700 block">
+                                        <i class="fa-solid fa-check-to-slot text-green-500 mr-1"></i>${item.districtCode}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            grid.innerHTML = htmlString;
+        }
+
+        function updatePaginationUI(totalPages) {
+            const infoText = `หน้า ${currentPage.toLocaleString()} / ${totalPages.toLocaleString()}`;
+            document.getElementById('pageInfoTop').innerText = infoText;
+            document.getElementById('pageInfoBottom').innerText = infoText;
+
+            const prevBtns = document.querySelectorAll('button[onclick="changePage(-1)"]');
+            const nextBtns = document.querySelectorAll('button[onclick="changePage(1)"]');
+
+            prevBtns.forEach(btn => btn.disabled = currentPage === 1);
+            nextBtns.forEach(btn => btn.disabled = currentPage === totalPages || totalPages === 0);
+        }
+
+        function formatIdCard(id) {
+            if (!id || id.length < 13) return id;
+            return `${id.substring(0,1)}-${id.substring(1,5)}-${id.substring(5,10)}-${id.substring(10,12)}-${id.substring(12,13)}`;
+        }
+    </script>
+</body>
+</html>
