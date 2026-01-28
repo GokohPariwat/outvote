@@ -31,7 +31,7 @@
         /* Loading Overlay */
         .loader {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #8b5cf6; /* เปลี่ยนเป็นสีม่วงเพื่อให้เข้ากับโลโก้ */
+            border-top: 4px solid #8b5cf6;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -55,12 +55,11 @@
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center flex-col text-white">
         <div class="loader mb-4"></div>
-        <p class="text-lg font-medium">กำลังประมวลผลฐานข้อมูล...</p>
-        <p class="text-sm text-gray-300">กรุณารอสักครู่ (ระบบกำลังสร้างดัชนีการค้นหา)</p>
+        <p class="text-lg font-medium">กำลังโหลดฐานข้อมูล...</p>
+        <p class="text-sm text-gray-300">Phayathaioutvote.csv</p>
     </div>
 
-    <!-- Header (จะแสดงปุ่มอัปโหลดเล็ก ก็ต่อเมื่อเข้าสู่หน้าค้นหาแล้ว) -->
-    <!-- ปรับสี Header เป็นสีม่วงโทนเดียวกับโลโก้เขตพญาไท -->
+    <!-- Header -->
     <header class="bg-purple-900 text-white shadow-lg sticky top-0 z-50 transition-all duration-300">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -74,7 +73,7 @@
                 </div>
             </div>
             
-            <!-- ปุ่ม Upload มุมขวาบน (ซ่อนในตอนแรก) -->
+            <!-- ปุ่ม Upload (Manual Override) -->
             <div id="headerActions" class="hidden">
                 <label for="csvFileInputHeader" class="cursor-pointer bg-purple-800 hover:bg-purple-700 text-white py-1.5 px-3 rounded-md border border-purple-600 shadow-sm transition-all text-xs font-medium flex items-center gap-2">
                     <i class="fa-solid fa-file-arrow-up"></i>
@@ -88,33 +87,32 @@
     <!-- Main Content -->
     <main class="flex-grow container mx-auto px-4 py-8 relative">
 
-        <!-- 1. LANDING PAGE (หน้าแรกสำหรับอัปโหลด) -->
-        <div id="landingPage" class="absolute inset-0 flex flex-col items-center justify-center z-40 fade-in px-4" style="margin-top: -80px;">
+        <!-- 1. LANDING PAGE (แสดงเมื่อโหลดไฟล์อัตโนมัติไม่เจอ) -->
+        <div id="landingPage" class="absolute inset-0 flex flex-col items-center justify-center z-40 fade-in px-4 hidden" style="margin-top: -80px;">
             <div class="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-lg w-full border border-purple-100">
                 
-                <!-- Large Logo on Landing Page -->
                 <div class="w-32 h-32 mx-auto mb-6">
                     <img src="logo สำนักงานเขตพญาไท.jpg" alt="Logo เขตพญาไท" class="w-full h-full object-contain drop-shadow-lg" onerror="this.parentElement.innerHTML='<div class=\'w-full h-full bg-purple-50 text-purple-600 rounded-full flex items-center justify-center text-4xl shadow-inner\'><i class=\'fa-solid fa-building-columns\'></i></div>'">
                 </div>
 
-                <h2 class="text-2xl font-bold text-gray-800 mb-2">ระบบค้นหาข้อมูลผู้มีสิทธิ์เลือกตั้งล่วงหน้า</h2>
-                <p class="text-gray-500 mb-8">สำนักงานเขตพญาไท</p>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">ไม่พบไฟล์ฐานข้อมูลหลัก</h2>
+                <p class="text-gray-500 mb-8">ระบบไม่พบไฟล์ <code>Phayathaioutvote.csv</code> <br>กรุณาอัปโหลดไฟล์ด้วยตนเอง</p>
                 
                 <label for="csvFileInputMain" class="cursor-pointer group relative flex w-full justify-center rounded-xl bg-purple-700 px-8 py-4 text-base font-semibold text-white shadow-lg hover:bg-purple-600 hover:shadow-purple-500/30 transition-all duration-200">
                     <span class="flex items-center gap-3">
                         <i class="fa-solid fa-folder-open text-xl group-hover:scale-110 transition-transform"></i>
-                        นำเข้าฐานข้อมูล (CSV)
+                        เลือกไฟล์ CSV
                     </span>
                 </label>
                 <input type="file" id="csvFileInputMain" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
                 
                 <p class="text-xs text-gray-400 mt-6 border-t pt-4">
-                    รองรับไฟล์ขนาดใหญ่
+                    Developed by Nitithon
                 </p>
             </div>
         </div>
         
-        <!-- 2. APP CONTENT (ส่วนค้นหาและแสดงผล - ซ่อนไว้ตอนแรก) -->
+        <!-- 2. APP CONTENT (แสดงผลการค้นหา) -->
         <div id="appContent" class="hidden fade-in">
             <!-- Search Bar -->
             <div class="max-w-2xl mx-auto mb-8 text-center sticky top-20 z-40 mt-2">
@@ -189,11 +187,30 @@
         let currentPage = 1;     
         const ITEMS_PER_PAGE = 24; 
         let searchTimeout = null; 
+        const DEFAULT_FILENAME = 'Phayathaioutvote.csv';
 
-        // --- เริ่มต้นใช้งาน (ไม่มีข้อมูลตัวอย่างแล้ว) ---
+        // --- เริ่มต้นใช้งาน ---
         document.addEventListener('DOMContentLoaded', () => {
-            // เช็คสถานะเริ่มต้น: ไม่มีข้อมูล -> แสดง Landing Page
-            toggleViews();
+            // แสดง Loading ทันทีที่เปิด
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            
+            // พยายามโหลดไฟล์ CSV อัตโนมัติ
+            Papa.parse(DEFAULT_FILENAME, {
+                download: true, // บอกให้ไปโหลดจาก URL/Path
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    console.log(`Auto-loaded ${DEFAULT_FILENAME} successfully.`);
+                    processCSVData(results); // เรียกฟังก์ชันประมวลผลกลาง
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                },
+                error: function(err) {
+                    console.warn(`Could not auto-load ${DEFAULT_FILENAME}. Switching to manual mode.`, err);
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                    // ถ้าโหลดไม่ได้ ให้แสดงหน้า Landing Page ปกติ
+                    toggleViews(); 
+                }
+            });
         });
 
         // ฟังก์ชันสลับหน้าจอ (Landing vs App)
@@ -205,7 +222,7 @@
             if (allData.length === 0) {
                 // ยังไม่มีข้อมูล: โชว์หน้า Landing
                 landing.classList.remove('hidden');
-                landing.classList.add('flex'); // ใช้ flex จัดกึ่งกลาง
+                landing.classList.add('flex');
                 app.classList.add('hidden');
                 headerActions.classList.add('hidden');
             } else {
@@ -213,11 +230,40 @@
                 landing.classList.add('hidden');
                 landing.classList.remove('flex');
                 app.classList.remove('hidden');
-                headerActions.classList.remove('hidden'); // โชว์ปุ่มเปลี่ยนไฟล์ข้างบน
+                headerActions.classList.remove('hidden');
             }
         }
 
-        // --- 1. File Upload Logic ---
+        // --- Logic ประมวลผลข้อมูล (ใช้ร่วมกันทั้ง Auto-load และ Manual Upload) ---
+        function processCSVData(results) {
+            const rawData = results.data.map((row, index) => ({
+                id: index,
+                idCard: (row['เลขประจำตัวประชาชน'] || row[0] || "").trim(),
+                seq: (row['ลำดับที่'] || row[1] || "").trim(),
+                prefix: (row['คำนำหน้า'] || row[2] || "").trim(),
+                firstName: (row['ชื่อ'] || row[3] || "").trim(),
+                lastName: (row['สกุล'] || row[4] || "").trim(),
+                gender: (row['เพศ'] || row[5] || "").trim(),
+                districtCode: (row['รหัสเขตเลือกตั้ง'] || row[6] || "").trim(),
+                province: (row['จังหวัด'] || row[7] || "").trim(),
+                setNo: (row['ชุดที่'] || row[8] || "").trim(),
+                // สร้าง Search String ไว้ล่วงหน้า
+                searchStr: `${row['เลขประจำตัวประชาชน']} ${row['ชื่อ']} ${row['สกุล']} ${row['จังหวัด']} ${row['รหัสเขตเลือกตั้ง']} ${row['ชุดที่']}`.toLowerCase()
+            }));
+
+            // กรองข้อมูลว่างออก
+            allData = rawData.filter(item => item.idCard !== "");
+            filteredData = allData;
+            
+            // Reset UI
+            document.getElementById('searchInput').value = '';
+            currentPage = 1;
+
+            toggleViews(); // สลับหน้าจอไปที่ App
+            updateView();  // แสดงผล Grid
+        }
+
+        // --- 1. Manual File Upload Logic ---
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -230,35 +276,12 @@
                     skipEmptyLines: true,
                     worker: true,
                     complete: function(results) {
-                        const rawData = results.data.map((row, index) => ({
-                            id: index,
-                            idCard: (row['เลขประจำตัวประชาชน'] || row[0] || "").trim(),
-                            seq: (row['ลำดับที่'] || row[1] || "").trim(),
-                            prefix: (row['คำนำหน้า'] || row[2] || "").trim(),
-                            firstName: (row['ชื่อ'] || row[3] || "").trim(),
-                            lastName: (row['สกุล'] || row[4] || "").trim(),
-                            gender: (row['เพศ'] || row[5] || "").trim(),
-                            districtCode: (row['รหัสเขตเลือกตั้ง'] || row[6] || "").trim(),
-                            province: (row['จังหวัด'] || row[7] || "").trim(),
-                            setNo: (row['ชุดที่'] || row[8] || "").trim(),
-                            searchStr: `${row['เลขประจำตัวประชาชน']} ${row['ชื่อ']} ${row['สกุล']} ${row['จังหวัด']} ${row['รหัสเขตเลือกตั้ง']} ${row['ชุดที่']}`.toLowerCase()
-                        }));
-
-                        // กรองข้อมูลว่างออก
-                        allData = rawData.filter(item => item.idCard !== "");
-                        filteredData = allData; // เริ่มต้นให้แสดงทั้งหมดที่โหลดมา
-                        
-                        document.getElementById('searchInput').value = '';
-                        currentPage = 1;
-
-                        toggleViews(); // สลับไปหน้า App
-                        updateView();  // แสดงผล
-                        
+                        processCSVData(results); // ใช้ฟังก์ชันเดียวกับ Auto-load
                         document.getElementById('loadingOverlay').classList.add('hidden');
                     },
                     error: function(err) {
                         document.getElementById('loadingOverlay').classList.add('hidden');
-                        alert('เกิดข้อผิดพลาด: ' + err.message);
+                        alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
                     }
                 });
             }, 100);
